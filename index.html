@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Drape Shield simulator</title>
+<style>
+:root{--bg:#eef1f7;--ink:#1b2a5e;--mute:#566086;--card:#fff;--line:#d3d8e6;--bad:#c4382f;--good:#168a74;--btn:#1b2a5e;--btnt:#fff;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#10162b;--ink:#e8ecfa;--mute:#a3acce;--card:#18203d;--line:#2d3760;--bad:#ff8277;--good:#4fd1b5;--btn:#e8ecfa;--btnt:#10162b}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#10162b;--ink:#e8ecfa;--mute:#a3acce;--card:#18203d;--line:#2d3760;--bad:#ff8277;--good:#4fd1b5;--btn:#e8ecfa;--btnt:#10162b}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;background-color:var(--bg)}
+main{max-width:940px;margin:0 auto;padding:20px 16px 32px}
+h1{font:700 30px/1.15 Georgia,"Times New Roman",serif;margin:0 0 4px}
+.sub{color:var(--mute);margin:0 0 16px}
+.scene{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);font-weight:600}
+#label{font-size:18px}
+#v{position:relative;aspect-ratio:15/8;background:linear-gradient(#a9cbe8,#e6eef3 65%,#f1e4c9);touch-action:none;cursor:grab;overflow:hidden}#v canvas{display:block;width:100%;height:100%}.tag{position:absolute;font:600 13px system-ui,sans-serif;background:rgba(255,255,255,.92);padding:2px 9px;border-radius:6px;border:1px solid #c9d0e2;pointer-events:none;white-space:nowrap;transform:translate(-50%,-130%)}
+#cap{min-height:3.2em;padding:12px 14px;font-size:18px;border-top:1px solid var(--line)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line)}
+.stats div{padding:10px 14px;border-right:1px solid var(--line)}.stats div:last-child{border:0}
+.stats small{display:block;color:var(--mute)}.stats b{font-size:17px}
+.bad{color:var(--bad)}.good{color:var(--good)}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+button{font:inherit;font-weight:600;padding:9px 16px;border-radius:8px;border:1px solid var(--btn);background:var(--btn);color:var(--btnt);cursor:pointer}
+button.o{background:transparent;color:var(--ink);border-color:var(--line)}
+button:focus-visible{outline:3px solid #d9822b;outline-offset:2px}
+#res{margin-top:6px}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:560px;background:var(--card)}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:#1b2a5e;color:#fff}td:first-child{font-weight:600}td:nth-child(3){color:var(--good);font-weight:600}
+.note{color:var(--mute);font-size:14px;margin:10px 0 0}
+@media (max-width:560px){.stats{grid-template-columns:1fr}.stats div{border-right:0;border-bottom:1px solid var(--line)}h1{font-size:26px}}
+</style></head><body><main>
+<h1>Drape Shield simulator</h1>
+<p class="sub">Drag the scene to look around. Every run is new: a different cloth, gust and rider reaction. Both guards face the same conditions.</p>
+<div class="scene">
+<div class="bar"><span id="label">Traditional saree guard</span></div>
+<div id="v"><span class="tag" id="t1"></span><span class="tag" id="t2"></span></div>
+<div id="cap" aria-live="polite"></div>
+<div id="lg" class="note" style="padding:8px 14px;margin:0;border-top:1px solid var(--line)"></div><div class="stats"><div><small>Cloth reaches the tyre</small><b id="s1">No</b></div><div><small>Rider warned</small><b id="s2">No</b></div><div><small>Outcome</small><b id="s3">Riding</b></div></div>
+</div>
+<div class="ctl"><button id="b0">New run, both guards</button><button class="o" id="b1">Traditional only</button><button class="o" id="b2">Drape Shield only</button></div><p class="note" id="info"></p>
+<section id="res" hidden><div class="tw"><table>
+<tr><th>What matters</th><th>Traditional guard</th><th>Drape Shield</th></tr>
+<tr><td>Gap to the tyre</td><td>Side frame blocks the side, but its edge and the gap stay open</td><td>Overlapping ribs, no gaps</td></tr>
+<tr><td>Fits different wheels</td><td>One wheel, one bike</td><td>Radius adjusts from 270 to 380 mm</td></tr>
+<tr><td>Warns the rider</td><td>No</td><td>Yes, a vibration and then a beep</td></tr>
+<tr><td>Help after a crash</td><td>None</td><td>Crash detected, SMS with a live GPS link</td></tr>
+<tr><td>Cost to start</td><td>Fixed guard</td><td>Layer 1 from ₹600, no electronics</td></tr></table></div>
+<p class="note">This is an illustrative simulation of how each layer works. Measured results will be added after the planned validation tests.</p></section>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=i=>document.getElementById(i),V=$('v'),PI=Math.PI;
+const R=1,RP=1.2,GO=1.3,PZ=.26,GZ=.32,N=13,AN={x:1.95,y:2,z:.4},TSA=.3*PI;
+const PA=-.8*PI,AL=1.75*PI,inP=a=>a>=PA&&a<=.95*PI,inG=a=>a>=0&&a<=.95*PI;
+const rn=new THREE.WebGLRenderer({antialias:true,alpha:true});rn.setPixelRatio(Math.min(2,devicePixelRatio));V.prepend(rn.domElement);
+const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(38,15/8,.1,60);
+rn.outputEncoding=THREE.sRGBEncoding;rn.shadowMap.enabled=true;rn.shadowMap.type=THREE.PCFSoftShadowMap;
+rn.toneMapping=THREE.ACESFilmicToneMapping;{const pm=new THREE.PMREMGenerator(rn),es=new THREE.Scene();es.background=new THREE.Color(0xdfe6f3);const l1=new THREE.Mesh(new THREE.BoxGeometry(8,.2,8),new THREE.MeshBasicMaterial({color:0xffffff}));l1.position.y=5;es.add(l1);const g1=new THREE.Mesh(new THREE.BoxGeometry(40,.2,40),new THREE.MeshBasicMaterial({color:0x667090}));g1.position.y=-5;es.add(g1);sc.environment=pm.fromScene(es,.04).texture}
+sc.add(new THREE.HemisphereLight(0xffffff,0x8a93b0,.75));const dl=new THREE.DirectionalLight(0xffffff,1.1);dl.position.set(4,9,6);dl.castShadow=true;dl.shadow.mapSize.set(2048,2048);Object.assign(dl.shadow.camera,{left:-9,right:9,top:6,bottom:-6,far:30});sc.add(dl);
+const M=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.55,metalness:.12},o)),K=new THREE.MeshBasicMaterial({color:0x14172b,side:THREE.BackSide});
+function mk(geo,c,p=[0,0,0],par,ol=1.07,o){const m=new THREE.Mesh(geo,M(c,o));m.position.set(...p);m.castShadow=true;(par||sc).add(m);return m}
+function bar(a,b,r,c,par,ol=1.25){const d=new THREE.Vector3(...b).sub(new THREE.Vector3(...a)),m=mk(new THREE.CylinderGeometry(r,r,d.length(),8),c,a.map((v,i)=>(v+b[i])/2),par,ol);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());return m}
+const ball=(r,c,p,par,ol=1.08)=>mk(new THREE.SphereGeometry(r,14,10),c,p,par,ol);
+const arcM=(r,a,l,t,c,z,par)=>{const m=mk(new THREE.TorusGeometry(r,t,8,40,l),c,[0,0,z],par,1.2);m.rotation.z=a;return m};
+const pt=(a,r,z)=>[Math.cos(a)*r,Math.sin(a)*r,z];
+const bike=new THREE.Group();sc.add(bike);
+const mt=(c,r,m,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:r,metalness:m},o));
+const PAINT=mt(0xa81d18,.28,.55),CHR=mt(0xd7dbe4,.18,.95),BLK=mt(0x15171f,.55,.25),SEAT=mt(0x141620,.85,0),ALU=mt(0x9aa0b4,.4,.8),RUB=mt(0x121318,.95,0),SPR=mt(0xd01f1f,.4,.3),DISC=mt(0x9aa0b4,.4,.8,{side:THREE.DoubleSide}),AMB=mt(0xffa500,.3,0,{emissive:0xff8c00,emissiveIntensity:.5}),GLS=mt(0xffe9a3,.1,0,{emissive:0xffd45a,emissiveIntensity:.5}),RED=mt(0xd01f1f,.2,.1,{emissive:0xb00000,emissiveIntensity:.6});
+const V3=(q)=>new THREE.Vector3(...q);
+const mm=(geo,mat,p=[0,0,0],par=bike)=>{const m=new THREE.Mesh(geo,mat);m.position.set(...p);m.castShadow=true;par.add(m);return m};
+const tb=(a,b,r,mat,par=bike)=>{const d=V3(b).sub(V3(a)),m=mm(new THREE.CylinderGeometry(r,r,d.length(),10),mat,a.map((v,i)=>(v+b[i])/2),par);m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());return m};
+const ex=(pts,w,mat,bev=.05,p=[0,0,0])=>{const sh=new THREE.Shape();pts.forEach((q,i)=>{if(q.length==4)sh.quadraticCurveTo(...q);else i?sh.lineTo(q[0],q[1]):sh.moveTo(q[0],q[1])});const g=new THREE.ExtrudeGeometry(sh,{depth:w,bevelEnabled:true,bevelThickness:bev,bevelSize:bev,bevelSegments:3,curveSegments:12});g.translate(0,0,-w/2);return mm(g,mat,p)};
+const tube=(pts,r,mat)=>mm(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(V3)),40,r,8),mat);
+function W(g,front){
+ mm(new THREE.TorusGeometry(.88,.12,14,48),RUB,[0,0,0],g);mm(new THREE.TorusGeometry(.73,.03,8,48),ALU,[0,0,0],g);
+ for(let k=0;k<32;k++){const a=k*PI/16,b=a+(k%2?.35:-.35),z=k%2?.05:-.05;tb([Math.cos(a)*.14,Math.sin(a)*.14,z],[Math.cos(b)*.71,Math.sin(b)*.71,0],.007,CHR,g)}
+ mm(new THREE.CylinderGeometry(.16,.16,.3,18),ALU,[0,0,0],g).rotation.x=PI/2;
+ if(front)mm(new THREE.RingGeometry(.3,.52,40),DISC,[0,0,.14],g);
+ else{mm(new THREE.CylinderGeometry(.34,.34,.22,24),ALU,[0,0,-.1],g).rotation.x=PI/2;mm(new THREE.CylinderGeometry(.26,.26,.03,20),ALU,[0,0,.17],g).rotation.x=PI/2}
+}
+const wheel=new THREE.Group(),fw=new THREE.Group();bike.add(wheel,fw);W(wheel,0);fw.position.x=4.2;W(fw,1);
+for(const z of[-.16,.16])tb([0,0,z],[2.6,.3,z],.06,BLK);
+tb([3.85,1.7,0],[2.7,.35,0],.07,BLK);tb([3.7,1.45,0],[.6,1.1,0],.07,BLK);
+tb([0,.13,.16],[2.5,.4,.16],.02,ALU);tb([0,-.13,.16],[2.5,.28,.16],.02,ALU);mm(new THREE.BoxGeometry(2.4,.08,.1),BLK,[1.25,.36,.21]).rotation.z=.11;
+mm(new THREE.CylinderGeometry(.46,.46,.62,24),ALU,[2.35,.55,0]).rotation.x=PI/2;
+for(let k=0;k<6;k++){const t=-.25+k*.14;mm(new THREE.BoxGeometry(.62,.035,.5),ALU,[2.65+.48*t,.95+.88*t,0]).rotation.z=-.5}
+tube([[2.95,.7,-.4],[3.15,.05,-.45],[2.5,-.2,-.48],[1.0,-.15,-.5]],.06,CHR);
+mm(new THREE.CylinderGeometry(.15,.13,1.6,20),CHR,[.3,-.12,-.5]).rotation.z=PI/2;mm(new THREE.CylinderGeometry(.08,.14,.1,16),BLK,[-.55,-.12,-.5]).rotation.z=PI/2;
+ex([[.2,1.05],[.2,1.26],[.6,1.37,1.0,1.31],[2.3,1.33],[2.75,1.38,2.88,1.2],[2.88,1.05],[.2,1.05]],.72,SEAT);
+ex([[2.5,1.35],[2.55,1.88,3.1,1.92],[3.7,1.88],[3.98,1.78,3.9,1.4],[2.5,1.35]],.62,PAINT,.08);
+ex([[.55,1.02],[.55,1.36],[-.4,1.42,-1.28,1.3],[-1.36,1.14],[-.5,.98,.55,1.02]],.56,PAINT);
+for(const z of[-.31,.31])ex([[.8,.5],[.8,1.04],[2.2,1.04],[2.3,.75],[1.9,.5],[.8,.5]],.05,PAINT,.03,[0,0,z]);
+const fr=mm(new THREE.TorusGeometry(1.1,.05,6,36,.84*PI),BLK);fr.rotation.z=.08*PI;fr.scale.z=3.4;mm(new THREE.BoxGeometry(.03,.4,.4),RUB,[-1.1,.12,0]);
+const ff=mm(new THREE.TorusGeometry(1.1,.05,6,36,.7*PI),PAINT,[4.2,0,0]);ff.rotation.z=.05*PI;ff.scale.z=3.4;
+mm(new THREE.BoxGeometry(.25,.2,.45),RED,[-1.45,1.28,0]);for(const z of[-.3,.3]){mm(new THREE.SphereGeometry(.07,12,10),AMB,[-1.38,1.12,z]);mm(new THREE.SphereGeometry(.07,12,10),AMB,[3.9,1.72,z*1.3])}
+tube([[.55,1.4,.34],[-.3,1.58,.36],[-1,1.6,.3],[-1.32,1.5,0],[-1,1.6,-.3],[-.3,1.58,-.36],[.55,1.4,-.34]],.035,BLK);
+const cv2=document.createElement('canvas');cv2.width=128;cv2.height=64;const x2=cv2.getContext('2d');x2.fillStyle='#fff';x2.fillRect(0,0,128,64);x2.strokeStyle='#111';x2.lineWidth=4;x2.strokeRect(2,2,124,60);x2.fillStyle='#111';x2.font='bold 28px sans-serif';x2.textAlign='center';x2.fillText('OD 02',64,28);x2.fillText('AB 1234',64,56);
+const pl=new THREE.Mesh(new THREE.PlaneGeometry(.7,.35),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cv2),side:THREE.DoubleSide}));pl.position.set(-1.5,.68,0);pl.rotation.y=-PI/2;bike.add(pl);tb([-1.2,1.05,0],[-1.5,.85,0],.02,BLK);
+for(const z of[-.5,.5]){const lo=[.25,.15,z],up=[.72,1.15,z],d=V3(up).sub(V3(lo)).normalize();tb(lo,up,.03,CHR);for(let k=0;k<9;k++){const t=.2+.72*k/8,r=mm(new THREE.TorusGeometry(.075,.016,6,14),SPR,lo.map((v,i)=>v+(up[i]-v)*t));r.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1),d)}}
+tb([2.7,.3,-.4],[2.7,.3,.4],.03,CHR);tb([1.5,.3,.7],[1.5,.3,.95],.03,BLK);tb([2.2,.35,.15],[2,-.9,.3],.03,BLK);
+for(const z of[-.2,.2]){tb([3.85,1.9,z],[4.04,.85,z],.05,CHR);tb([4.04,.85,z],[4.2,0,z],.065,BLK)}
+mm(new THREE.BoxGeometry(.18,.1,.6),BLK,[3.85,1.85,0]);
+mm(new THREE.SphereGeometry(.3,20,14),CHR,[4.3,1.72,0]).scale.set(.8,1,1);mm(new THREE.SphereGeometry(.24,20,14),GLS,[4.42,1.72,0]).scale.set(.45,1,1);
+tb([3.8,2,-.5],[3.8,2,.5],.025,CHR);for(const z of[-1,1]){tb([3.8,2,z*.38],[3.8,2,z*.52],.04,RUB);tb([3.8,2,z*.35],[3.68,2.45,z*.4],.015,CHR);mm(new THREE.SphereGeometry(.1,12,10),BLK,[3.66,2.5,z*.42]).scale.set(.4,.8,1)}
+mm(new THREE.CylinderGeometry(.18,.2,.15,20),BLK,[3.95,2.15,0]).rotation.z=-.8;
+const saree=M(0xd9467f),G=M(0xd8dce6),J=M(0x39405c);
+const hp=new THREE.Group(),hu=new THREE.Group();sc.add(hp);hp.add(hu);hu.position.set(-1.9,-1.4,0);
+const sb=(a,b,r,m)=>{const q=bar(a,b,r,0,hu,0);q.material=m;return q};
+const sbl=(r,p,m,k)=>{const q=ball(r,0,p,hu,0);q.material=m;if(k)q.scale.set(...k);return q};
+sbl(.38,[1.85,1.4,0],saree,[1.1,.7,1]);
+for(const z of[-.2,.2]){sb([1.9,1.4,z],[2.75,1.55,z],.15,saree);sbl(.15,[2.75,1.55,z],J);sb([2.75,1.55,z],[2.65,.45,z],.12,saree);sbl(.13,[2.78,.38,z],J,[1.5,.8,1])}
+bar([2.7,.3,-.35],[2.7,.3,.35],.03,0x17171f,bike);
+sb([1.9,1.4,0],[2.15,2.05,0],.3,G);sbl(.3,[2.15,2.05,0],G);sb([1.98,2.02,.36],[2,1.5,-.25],.09,saree);sbl(.15,[1.98,2,.36],saree);
+for(const z of[-.4,.4]){sbl(.1,[2.2,1.95,z*.85],J);sb([2.2,1.95,z*.85],[2.9,1.72,z],.08,G);sbl(.08,[2.9,1.72,z],J);sb([2.9,1.72,z],[3.75,1.98,z*1.1],.08,G);sbl(.1,[3.8,2,z*1.1],J)}
+const mkr=(z)=>{const d=mk(new THREE.CircleGeometry(.12,20),0x111,[2.1,1.75,z],hu,0,{side:THREE.DoubleSide});for(const k of[0,2]){const q=mk(new THREE.CircleGeometry(.12,8,k*PI/2,PI/2),0xf2c230,[2.1,1.75,z+(z>0?.003:-.003)],hu,0,{side:THREE.DoubleSide})}};mkr(.31);mkr(-.31);
+sb([2.2,2.2,0],[2.32,2.42,0],.1,J);
+const HW=0xf2f2f5,hc=[2.35,2.64,0];
+ball(.46,HW,hc,hu,0).scale.set(1.08,1,.96);
+mk(new THREE.BoxGeometry(.3,.26,.5),HW,[2.72,2.36,0],hu,0);
+const vs=mk(new THREE.SphereGeometry(.475,16,10,Math.PI-.75,1.5,.28*PI,.27*PI),0x14203f,hc,hu,0,{side:THREE.DoubleSide,roughness:.15,metalness:.4});vs.scale.set(1.1,1.02,.98);
+const st=mk(new THREE.TorusGeometry(.48,.03,6,24,PI),0xc4382f,hc,hu,0);st.scale.set(1.08,1,1);
+mk(new THREE.BoxGeometry(.28,.05,.4),0x23263f,[2.7,2.22,0],hu,0);mk(new THREE.BoxGeometry(.12,.1,.4),HW,[1.88,2.45,0],hu,0);
+const gd=new THREE.Group(),pn=new THREE.Group();bike.add(gd,pn);
+const GA=.95*PI;
+for(const r of[.8,.97,1.14,GO])arcM(r,0,GA,.03,0x17171f,GZ,gd);
+bar(pt(0,.8,GZ),pt(0,GO,GZ),.03,0x17171f,gd);bar(pt(GA,.8,GZ),pt(GA,GO,GZ),.03,0x17171f,gd);
+for(let k=1;k<4;k++)bar(pt(GA*k/4,.8,GZ),pt(GA*k/4,GO,GZ),.02,0x17171f,gd);
+bar(pt(0,GO,GZ),[.15,-.1,.18],.04,0x17171f,gd);bar(pt(GA,GO,GZ),[-.15,-.05,.18],.04,0x17171f,gd);
+mk(new THREE.CircleGeometry(RP-.1,64,PA,AL),0x2c5aa8,[0,0,PZ],pn,0,{side:THREE.DoubleSide});
+mk(new THREE.RingGeometry(RP-.1,RP,64,1,PA,AL),0xd9722a,[0,0,PZ+.005],pn,0,{side:THREE.DoubleSide});
+for(let k=0;k<8;k++){const c=PA+AL*(k+.5)/8,hw=AL/8*.4;
+ mk(new THREE.RingGeometry(.22,RP-.16,10,1,c-hw,2*hw),0xe5b030,[0,0,PZ+.03],pn,0,{side:THREE.DoubleSide});
+ bar(pt(c,.45,PZ+.05),pt(c,RP-.32,PZ+.05),.02,0x4a3a1a,pn,0);ball(.035,0xeeeeee,pt(c,.32,PZ+.06),pn,0);ball(.035,0xeeeeee,pt(c,RP-.24,PZ+.06),pn,0)}
+mk(new THREE.CylinderGeometry(.16,.16,.08,20),0x168a74,[0,0,PZ+.05],pn,0).rotation.x=PI/2;mk(new THREE.CylinderGeometry(.07,.07,.1,16),0xffffff,[0,0,PZ+.06],pn,0).rotation.x=PI/2;
+const SV=new THREE.Vector3(Math.cos(TSA)*(RP-.03),Math.sin(TSA)*(RP-.03),PZ+.04);
+mk(new THREE.BoxGeometry(.12,.12,.08),0xffffff,SV.toArray(),pn,1.3);
+const cone=new THREE.Mesh(new THREE.SphereGeometry(.9,20,14),new THREE.MeshBasicMaterial({color:0x168a74,transparent:true,opacity:.14,depthWrite:false}));cone.position.copy(SV);pn.add(cone);
+const ring=new THREE.Mesh(new THREE.RingGeometry(.12,.15,24),new THREE.MeshBasicMaterial({color:0xd9822b,transparent:true,side:THREE.DoubleSide}));ring.position.copy(SV);pn.add(ring);
+const gd2=gd.clone(true),pn2=pn.clone(true);pn2.children.splice(-2,2);gd2.scale.z=pn2.scale.z=-1;bike.add(gd2,pn2);
+const dash=[];sc.fog=new THREE.Fog(0xe6eef3,16,48);
+const items=[],place=(m,x,y,z)=>{m.userData.x0=x;m.position.set(x,y,z);sc.add(m);items.push(m)};
+const ct=(w,h,f)=>{const c=document.createElement('canvas');c.width=w;c.height=h;f(c.getContext('2d'),w,h);const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;return t};
+mm(new THREE.BoxGeometry(60,.2,7.2),mt(0x3b3e46,.95,0),[0,-1.08,-.1],sc).receiveShadow=true;
+const tl=ct(128,8,(g,w,h)=>{g.fillStyle='#f4f4f0';g.fillRect(0,0,w*.55,h)});tl.repeat.set(11,1);
+const lane=mm(new THREE.PlaneGeometry(44,.14),new THREE.MeshBasicMaterial({map:tl,transparent:true}),[0,-.97,-2.2],sc);lane.rotation.x=-PI/2;
+const tk=ct(64,8,(g,w,h)=>{g.fillStyle='#e8b923';g.fillRect(0,0,w/2,h);g.fillStyle='#17171f';g.fillRect(w/2,0,w/2,h)});tk.repeat.set(36,1);
+const kerb=mm(new THREE.PlaneGeometry(44,.32),new THREE.MeshBasicMaterial({map:tk}),[0,-.97,-3.45],sc);kerb.rotation.x=-PI/2;
+mm(new THREE.BoxGeometry(60,.2,6),mt(0xa69f92,.9,0),[0,-.95,-6.9],sc).receiveShadow=true;
+const win=ct(128,128,(g,w,h)=>{g.fillStyle='#fff';g.fillRect(0,0,w,h);g.fillStyle='#46506a';for(let i=0;i<4;i++)for(let j=0;j<4;j++)g.fillRect(10+i*30,12+j*30,18,20)});
+const BC=[0xe9b36b,0xd96b6b,0x6bb3a8,0xf2d7a1,0x8fb6e0,0xd98fb0,0xcfa56a,0x9fc58a];
+for(let i=0;i<11;i++){const w=2.8+(i*7%5)*.5,h=3.5+(i*5%4)*1.2,b=mm(new THREE.BoxGeometry(w,h,2.6),mt(BC[i%8],.9,0,{map:win}),[0,0,0],sc);b.castShadow=false;place(b,i*4,h/2-.85,-11.5-(i%2)*.8)}
+const sign=(t,bg,x)=>{const p=new THREE.Mesh(new THREE.PlaneGeometry(2.2,.6),new THREE.MeshBasicMaterial({map:ct(256,64,(g,w,h)=>{g.fillStyle=bg;g.fillRect(0,0,w,h);g.fillStyle='#fff';g.font='bold 34px sans-serif';g.textAlign='center';g.fillText(t,w/2,44)})}));place(p,x,.7,-10.15)};
+sign('TEA STALL','#2e7d32',0);sign('MEDICAL','#1565c0',8);sign('KIRANA STORE','#c62828',16);sign('PAAN SHOP','#6a1b9a',24);
+for(let i=0;i<9;i++){const g=new THREE.Group();mm(new THREE.CylinderGeometry(.1,.14,1.8,8),mt(0x5a3d26,.9,0),[0,.9,0],g);for(const[dx,dy,r]of[[0,2.3,.95],[.5,1.9,.7],[-.5,2,.75]])mm(new THREE.SphereGeometry(r,12,10),mt(i%2?0x3f7d3a:0x2f6b34,.9,0),[dx,dy,0],g);place(g,i*5+1,-.85,-5.4-(i%3)*.5)}
+for(let i=0;i<4;i++){const g=new THREE.Group();mm(new THREE.CylinderGeometry(.07,.1,4.8,8),mt(0x8d8a84,.9,0),[0,2.4,0],g);mm(new THREE.BoxGeometry(.1,.1,1),mt(0x555555,.8,.3),[0,4.4,0],g);for(const dz of[-.4,0,.4]){const pts=[];for(let k=0;k<=12;k++){const t=k/12;pts.push(new THREE.Vector3(11*t,4.45-.45*Math.sin(Math.PI*t),dz))}g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0x222222})))}place(g,i*11+3,-.85,-4.3)}
+const NS=70,sg=new THREE.BufferGeometry(),sa=new Float32Array(NS*6),sx=[];for(let i=0;i<NS;i++)sx.push([Math.random()*14-5,Math.random()*4.4-1,Math.random()*4-1.5]);
+sg.setAttribute('position',new THREE.BufferAttribute(sa,3));sc.add(new THREE.LineSegments(sg,new THREE.LineBasicMaterial({color:0x7f96c4,transparent:true,opacity:.5})));let dd=.016;
+const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(N*6),3));
+const ix=[];for(let i=0;i<N-1;i++){const a=i*2;ix.push(a,a+1,a+2,a+1,a+3,a+2)}geo.setIndex(ix);const uv=new Float32Array(N*4);for(let i=0;i<N;i++){uv.set([0,i/(N-1),1,i/(N-1)],i*4)}geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));const geo2=geo.clone();
+const tc=document.createElement('canvas');tc.width=64;tc.height=256;const tx=new THREE.CanvasTexture(tc);
+function paint(col){const c=tc.getContext('2d');c.fillStyle=col;c.fillRect(0,0,64,256);for(let x=6;x<58;x+=6){c.fillStyle='rgba(0,0,0,'+(.05+.05*((x/6)%2))+')';c.fillRect(x,0,3,256)}c.fillStyle='#e5b030';c.fillRect(0,0,7,256);c.fillRect(57,0,7,256);c.fillStyle='rgba(255,255,255,.35)';for(let y=10;y<256;y+=22)c.fillRect(20,y,24,3);tx.needsUpdate=true}
+const cloth=new THREE.Mesh(geo,M(0xffffff,{side:THREE.DoubleSide,map:tx})),cl2=new THREE.Mesh(geo2,new THREE.MeshBasicMaterial({color:0x14172b,side:THREE.DoubleSide}));sc.add(cloth);cloth.castShadow=true;
+let az=.55,el=.24,dr=0,drag=0,P=null,S=null,seq=[],last=0,acc=0,dist=0,ox=0,oy=0;
+V.onpointerdown=e=>{drag=1;dr=1;ox=e.clientX;oy=e.clientY;V.setPointerCapture(e.pointerId)};V.onpointerup=()=>drag=0;
+V.onpointermove=e=>{if(!drag)return;az+=(e.clientX-ox)*.006;el=Math.max(-.05,Math.min(.9,el+(e.clientY-oy)*.005));ox=e.clientX;oy=e.clientY};
+function size(){const w=V.clientWidth;rn.setSize(w,w*8/15)}addEventListener('resize',size);size();
+function newP(){const T=[['cotton',0xd9467f,.985,1],['silk',0xe0842b,.992,.8],['nylon',0x2f8f83,.988,.9],['linen',0x7a5bb5,.982,1.15]],m=T[Math.random()*4|0];
+ return{m,gt:1.2+Math.random()*1.6,gs:.85+Math.random()*.7,ga:(Math.random()-.5)*.4,seg:.23+Math.random()*.04,wind:.4+Math.random()*.7,rx:.5+Math.random()*.6}}
+function start(type){
+ const p=[];for(let i=0;i<N;i++){const y=AN.y-i*P.seg;p.push({x:AN.x,y,z:AN.z,px:AN.x,py:y,pz:AN.z,grip:0,i})}
+ S={type,cr:0,tg:0,t:0,p,warn:0,tw:-1,grips:0,out:0,tOut:0,jam:0,frozen:0,w:9};
+ paint('#'+P.m[1].toString(16).padStart(6,'0'));saree.color.set(P.m[1]);
+ const tr=type=='trad';gd.visible=gd2.visible=tr;pn.visible=pn2.visible=!tr;
+ $('label').textContent=tr?'Traditional saree guard':'Drape Shield';$('res').hidden=true;
+ $('info').textContent=P.m[0]+' saree, gust '+P.gs.toFixed(1)+'× at '+P.gt.toFixed(1)+' s, rider reacts in '+P.rx.toFixed(1)+' s';
+}
+function step(d){
+ const s=S,p=s.p,sh=s.type=='shield',te=s.tw<0?99:s.tw+P.rx;s.t+=d;s.cr=s.out?Math.max(0,s.t-s.tOut-.3):0;if(s.cr>0&&!s.cs)s.cs={vb:9,vr:9,phi:.1,om:0,rx:0,ry:0,rz:0,vy:1.6,air:1,u:0};const cc=s.cs;
+ if(cc){cc.vb=Math.max(0,cc.vb-8.4*d);if(cc.air){cc.vy-=14*d;cc.ry+=cc.vy*d;cc.rz=Math.max(-1.8,cc.rz-1*d);if(cc.ry<-1.85){cc.ry=-1.85;cc.air=0}}else cc.vr=Math.max(0,cc.vr-9.1*d);cc.rx+=(cc.vr-cc.vb)*d;cc.om+=12.7*Math.sin(cc.phi)*d;cc.phi+=cc.om*d;if(cc.phi>1.38){cc.phi=1.38;cc.om=0}cc.u=Math.min(1,cc.u+d/(cc.air?1.1:.4))}
+ const sp=cc?cc.vb/9:1;
+ if(s.cr>.35&&!s.rel){s.rel=1;s.p.forEach(q=>q.grip=0)}
+ const gust=s.t>P.gt&&s.t<(sh?Math.min(te,9):s.out?s.tOut+.3:99),tuck=sh&&s.t>te&&s.t<te+.9;
+ s.w=9*sp*(1-.9*s.jam);if(s.cr>.05){hp.updateMatrix();const a=tv.set(AN.x-1.9,AN.y-1.4,AN.z).applyMatrix4(hp.matrix);p[0].x=a.x;p[0].y=a.y;p[0].z=a.z}dist+=s.w*d*R;
+ p.forEach((q,i)=>{
+  if(!i)return;
+  if(q.grip){q.a-=s.w*d;q.r=Math.max(.5,q.r-.3*d);const l=tv.set(Math.cos(q.a)*q.r,Math.sin(q.a)*q.r,q.lz).applyMatrix4(bike.matrix);q.x=l.x;q.y=l.y;q.z=l.z;q.px=q.x;q.py=q.y;q.pz=q.z;return}
+  const w0=-sp*P.wind*2,tn=Math.sin(q.y*2.1+s.t*5+i)+Math.sin(q.x*1.7-s.t*3.3),vx0=(q.x-q.px)/d,vy0=(q.y-q.py)/d,vz0=(q.z-q.pz)/d;
+  let ax=1.6*(w0+tn*.5*sp-vx0),ay=-5.2*P.m[3]+1.6*(Math.cos(q.x*2.3+s.t*4)*.4*sp-vy0),az=1.6*(Math.sin(q.y*1.9+s.t*3.7)*.4*sp-vz0);
+  if(gust){const dx=-q.x,dy=-q.y*(1+P.ga),dz=.05-q.z,l=Math.hypot(dx,dy,dz)||1,k=12*P.gs*i/N;ax+=dx/l*k;ay+=dy/l*k*.7;az+=dz/l*k}
+  if(tuck){ay+=8;ax+=3;az+=2}
+  const v=P.m[2],vx=(q.x-q.px)*v,vy=(q.y-q.py)*v,vz=(q.z-q.pz)*v;q.px=q.x;q.py=q.y;q.pz=q.z;q.x+=vx+ax*d*d;q.y+=vy+ay*d*d;q.z+=vz+az*d*d;
+ });
+ for(let it=0;it<24;it++){
+  for(let i=1;i<N;i++){
+   const a=p[i-1],b=p[i],dx=b.x-a.x,dy=b.y-a.y,dz=b.z-a.z,l=Math.hypot(dx,dy,dz)||1,df=(l-P.seg)/l,wA=(i==1||a.grip)?0:1,wB=b.grip?0:1,sm=wA+wB;if(!sm)continue;
+   a.x+=dx*df*wA/sm;a.y+=dy*df*wA/sm;a.z+=dz*df*wA/sm;b.x-=dx*df*wB/sm;b.y-=dy*df*wB/sm;b.z-=dz*df*wB/sm}
+  for(const q of p){
+   if(!q.i)continue;if(q.y<-.95)q.y=-.95;if(q.grip)continue;
+   const r=Math.hypot(q.x,q.y)||1,an=Math.atan2(q.y,q.x);
+   if(q.x>-1.4&&q.x<2.95&&q.y>1&&q.y<1.45&&Math.abs(q.z)<.45)q.z=(q.z<0?-1:1)*.46;
+   if(an>.08*PI&&an<.92*PI&&Math.abs(q.z)<.38&&r<1.16){q.x*=1.17/r;q.y*=1.17/r}
+   if(sh){if(r<RP+.03&&inP(an)){if(q.z>PZ-.05){if(q.z<PZ+.2)q.z=PZ+.2}else{q.x*=(RP+.04)/r;q.y*=(RP+.04)/r}}}
+   else{
+    if(r<GO+.03&&r>.78&&inG(an)&&q.z>GZ-.05&&q.z<GZ+.2)q.z=GZ+.2;
+    else if(r<R+.05&&Math.abs(q.z)<.2&&s.grips<7&&!s.rel&&s.t-s.tg>.14&&(q.i==N-1||p[q.i+1].grip)){q.grip=1;s.tg=s.t;q.a=an;q.r=Math.max(r,R+.05);q.z=Math.max(-.1,Math.min(.1,q.z));q.lz=q.z}}
+  }
+ }
+ s.grips=p.filter(q=>q.grip).length;
+ if(!sh){s.jam+=(Math.min(1,s.grips/6)-s.jam)*.05;
+  if(s.grips>=5&&!s.out){s.out=1;s.tOut=s.t}
+  if(s.out&&s.t-s.tOut>4.2||s.t>14)done();
+ }else{
+  s.warn=s.t>P.gt&&p.some(q=>q.i&&Math.hypot(q.x-SV.x,q.y-SV.y,q.z-SV.z)<.9)?1:0;
+  if(s.warn&&s.tw<0)s.tw=s.t;
+  if(s.t>Math.min(te,9)+3.2)done();
+ }
+}
+function done(){const n=seq.shift();
+ if(n=='res'){S.frozen=1;$('label').textContent='Result';$('res').hidden=false}else if(n)start(n);else S.frozen=1}
+const tag=(e,t,v,c)=>{const q=v.clone().project(cam);e.textContent=t;e.style.color=c;e.style.left=(q.x+1)/2*100+'%';e.style.top=(1-q.y)/2*100+'%'};
+const tv=new THREE.Vector3(),cd=new THREE.Vector3(),tg=new THREE.Vector3(),sd=new THREE.Vector3();
+function draw(t){
+ const s=S,p=s.p;if(!dr)az=.55+Math.sin(t/3500)*.07;
+ cam.position.set(2.1+Math.sin(az)*Math.cos(el)*13,.9+Math.sin(el)*13,Math.cos(az)*Math.cos(el)*13);cam.lookAt(2.1,.9,0);
+ wheel.rotation.z-=s.frozen?0:s.w/60;fw.rotation.z-=s.frozen?0:(s.cs?s.cs.vb:9)/60;items.forEach(m=>m.position.x=((m.userData.x0-dist)%44+44)%44-22);tl.offset.x=dist/4;tk.offset.x=dist/1.222;
+ const dc=s.cs,f=dc?dc.phi:0;
+ bike.rotation.set(f,0,s.type=='trad'?.03*s.jam*Math.sin(s.t*28):0);bike.position.set(0,-1+Math.cos(f)+.3*Math.sin(f),Math.sin(f));bike.updateMatrix();
+ hp.position.set(1.9+(dc?dc.rx:0),1.4+(dc?dc.ry:0),dc?dc.rz:0);{const u=dc?dc.u:0,e=u*u*(3-2*u);hp.rotation.set(1.5*e,0,1.5*e-.5*Math.sin(u*PI))}
+ cone.material.color.set(s.warn?0xffa500:0x168a74);cone.material.opacity=s.warn?.3:.14;
+ const k=(s.t*2)%1;ring.visible=!!s.warn;ring.scale.setScalar(1+k*3);ring.material.opacity=1-k;ring.lookAt(cam.position);
+ const pos=geo.attributes.position,pos2=geo2.attributes.position;cam.getWorldDirection(cd);
+ {const v=S.frozen?0:(S.cs?S.cs.vb/9:1);sx.forEach((a,i)=>{a[0]-=v*5*dd;if(a[0]<-5)a[0]+=14;const ry=Math.hypot(a[0],a[1]),y=a[1]+(ry<1.5&&Math.abs(a[2])<.6?Math.sign(a[1]||1)*(1.5-ry)*.5:0);sa.set([a[0],y,a[2],a[0]+.5*v,y,a[2]],i*6)});sg.attributes.position.needsUpdate=true}
+ const Q=p.map(q=>[q.x,q.y,q.z]);
+ for(let i=0;i<N;i++){const a=Q[Math.max(0,i-1)],b=Q[Math.min(N-1,i+1)],c=Q[i];tg.set(b[0]-a[0],b[1]-a[1],b[2]-a[2]);sd.crossVectors(tg,cd).normalize();
+  const w=.22+.06*i/N+.03*Math.sin(i*1.4+s.t*3);[[pos,w,0],[pos2,w+.025,.012]].forEach(([ps,ww,o])=>{ps.setXYZ(i*2,c[0]+sd.x*ww+cd.x*o,c[1]+sd.y*ww+cd.y*o,c[2]+sd.z*ww+cd.z*o);ps.setXYZ(i*2+1,c[0]-sd.x*ww+cd.x*o,c[1]-sd.y*ww+cd.y*o,c[2]-sd.z*ww+cd.z*o)})}
+ pos.needsUpdate=pos2.needsUpdate=true;
+ $('t1').textContent='';$('t2').textContent='';
+ rn.render(sc,cam);
+}
+function ui(){
+ const s=S,t=s.t,te=s.tw<0?99:s.tw+P.rx;let c;
+ if(s.type=='trad')c=s.out?'The cloth jams the rear wheel, the bike goes down and the rider is thrown.':s.grips?'The cloth swings round the edge of the guard, into the gap, and the tyre catches it.':t>=P.gt?'The guard blocks the side, but the gust sweeps the cloth round its edge.':'Riding normally with a traditional saree guard.';
+ else c=t>=te+1.3||t>=9?'Nothing reached the tyre. The ride continues.':t>=te?'The rider pulls the saree back in time.':s.warn?'The panel blocks the cloth. The sensor warns the rider with a vibration and a beep.':t>=P.gt?'The same gust pulls the cloth toward the wheel.':'Riding normally with Drape Shield.';
+ const ok=s.type!='trad'&&(t>=te+1.3||t>=9);
+ $('lg').textContent=s.type=='trad'?'Traditional guard: black steel side frame with an open gap between the frame and the tyre.':'Drape Shield: fan of overlapping ribs on the wheel side, with a time-of-flight sensor on the rim.';
+ $('cap').textContent=$('res').hidden?c:'Drape Shield closes the gap, warns the rider and sends for help.';
+ const set=(i,v,k)=>{const e=$(i);e.textContent=v;e.className=k||''};
+ set('s1',s.grips?'Yes':'No',s.grips?'bad':'good');
+ s.type=='trad'?set('s2','No warning','bad'):set('s2',s.tw>=0?'Yes':'Waiting',s.tw>=0?'good':'');
+ s.type=='trad'?set('s3',s.out?'Crash':'Riding',s.out?'bad':''):set('s3',ok?'Protected':'Riding',ok?'good':'');
+}
+function frame(t){const d=Math.min(.05,(t-last)/1000||0);last=t;dd=d;
+ if(!S.frozen){acc+=d;while(acc>=1/60){step(1/60);acc-=1/60}}
+ draw(t);ui();requestAnimationFrame(frame)}
+function run(q){P=newP();seq=q.slice(1);start(q[0])}
+$('b0').onclick=()=>run(['trad','shield','res']);$('b1').onclick=()=>run(['trad']);$('b2').onclick=()=>run(['shield']);
+run(['trad','shield','res']);requestAnimationFrame(frame);
+</script></main></body></html>
